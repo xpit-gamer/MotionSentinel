@@ -66,7 +66,7 @@ Place the .exe and hotkeys.json (optional) in the same directory.
 
 ## 📄 License
 
-MIT License (or your preferred license).
+MIT License.
 
 ## 👤 Developer
 
