@@ -1,0 +1,80 @@
+# ----------------------------------------
+# .NET build artifacts
+# ----------------------------------------
+bin/
+obj/
+out/
+*.exe
+*.dll
+*.pdb
+*.cache
+*.log
+
+# Publish output
+publish/
+*.appx
+*.msix
+*.msixbundle
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# ----------------------------------------
+# User-specific files
+# ----------------------------------------
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.csproj.user
+
+# VS Code
+.vscode/
+.history/
+
+# Visual Studio (if opened there)
+.vs/
+
+# ----------------------------------------
+# Windows files
+# ----------------------------------------
+Thumbs.db
+Desktop.ini
+
+# ----------------------------------------
+# JSON config (optional)
+# Uncomment if you want hotkeys.json ignored
+# hotkeys.json
+
+# ----------------------------------------
+# Logs and temp
+# ----------------------------------------
+*.tmp
+*.temp
+*.bak
+*.old
+
+# Crash dumps
+*.dmp
+
+# ----------------------------------------
+# JetBrains Rider
+# ----------------------------------------
+.idea/
+*.sln.iml
+
+# ----------------------------------------
+# ReSharper
+# ----------------------------------------
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# ----------------------------------------
+# Build tools
+# ----------------------------------------
+*.dbmdl
+*.jfm

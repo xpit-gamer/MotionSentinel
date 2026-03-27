@@ -1,0 +1,252 @@
+﻿using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace MotionSentinel
+{
+    partial class Form1
+    {
+        private System.ComponentModel.IContainer components = null;
+
+        private Label lblCenterXValue;
+        private Label lblCenterYValue;
+
+
+        private NumericUpDown numRadius;
+        private NumericUpDown numSpeed;
+        private NumericUpDown numCirclePause;
+
+        private Label lblX;
+        private Label lblY;
+        private Label lblR;
+        private Label lblSpeed;
+        private Label lblCirclePause;
+        private Label lblPattern;
+        private Label lblStatus;
+
+        private ComboBox cmbPattern;
+        private Button btnStart;
+        private Button btnStop;
+        private Button btnApply;
+
+        private ComboBox cmbHotkey;
+        private CheckBox chkCtrl;
+        private CheckBox chkAlt;
+        private CheckBox chkShift;
+        private Label lblHotkey;
+
+        private NotifyIcon trayIcon = null!;
+        private ContextMenuStrip trayMenu = null!;
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+                components.Dispose();
+            base.Dispose(disposing);
+        }
+
+        private void InitializeComponent()
+        {
+            this.components = new System.ComponentModel.Container();
+
+            this.lblCenterXValue = new Label();
+            this.lblCenterYValue = new Label();
+            this.numRadius = new NumericUpDown();
+            this.numSpeed = new NumericUpDown();
+            this.numCirclePause = new NumericUpDown();
+
+            this.lblX = new Label();
+            this.lblY = new Label();
+            this.lblR = new Label();
+            this.lblSpeed = new Label();
+            this.lblCirclePause = new Label();
+            this.lblPattern = new Label();
+            this.lblStatus = new Label();
+
+            this.cmbPattern = new ComboBox();
+            this.btnStart = new Button();
+            this.btnStop = new Button();
+            this.btnApply = new Button();
+
+            this.trayMenu = new ContextMenuStrip(this.components);
+            this.trayIcon = new NotifyIcon(this.components);
+
+            this.lblHotkey = new Label();
+            this.chkCtrl = new CheckBox();
+            this.cmbHotkey = new ComboBox();
+            this.chkAlt = new CheckBox();
+            this.chkShift = new CheckBox();
+
+            ((System.ComponentModel.ISupportInitialize)(this.numRadius)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numSpeed)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numCirclePause)).BeginInit();
+
+            this.SuspendLayout();
+
+            // Labels
+            this.lblX.Text = "Center X:";
+            this.lblX.Location = new Point(20, 20);
+
+            this.lblY.Text = "Center Y:";
+            this.lblY.Location = new Point(20, 50);
+
+            this.lblR.Text = "Radius:";
+            this.lblR.Location = new Point(20, 80);
+
+            this.lblSpeed.Text = "Speed (deg/step):";
+            this.lblSpeed.Location = new Point(20, 110);
+
+            this.lblCirclePause.Text = "Pause (ms):";
+            this.lblCirclePause.Location = new Point(20, 140);
+
+            this.lblPattern.Text = "Pattern:";
+            this.lblPattern.Location = new Point(20, 170);
+
+            this.lblStatus.Text = "Status: Stopped";
+            this.lblStatus.AutoSize = true;
+            this.lblStatus.Location = new Point(100, 250);
+            this.lblStatus.ForeColor = Color.Red;
+
+            this.lblHotkey.Text = "Hotkey:";
+            this.lblHotkey.Location = new Point(20, 280);
+
+            // NumericUpDowns
+            this.lblCenterXValue.Location = new Point(200, 20);
+            this.lblCenterXValue.AutoSize = true;
+            this.lblCenterXValue.Text = "0";
+
+            this.lblCenterYValue.Location = new Point(200, 50);
+            this.lblCenterYValue.AutoSize = true;
+            this.lblCenterYValue.Text = "0";
+
+            this.numRadius.Location = new Point(200, 80);
+            this.numRadius.Maximum = 2000;
+            this.numRadius.Value = 150;
+
+            this.numSpeed.Location = new Point(200, 110);
+            this.numSpeed.Minimum = 1;
+            this.numSpeed.Maximum = 20;
+            this.numSpeed.Value = 2;
+
+            this.numCirclePause.Location = new Point(200, 140);
+            this.numCirclePause.Maximum = 60000;
+            this.numCirclePause.Value = 25000;
+
+            // Hotkey key selector
+            this.cmbHotkey.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbHotkey.Location = new Point(200, 280);
+            this.cmbHotkey.Width = 120;
+            this.cmbHotkey.SelectedIndexChanged += (s, e) => btnApply.Enabled = true;
+
+            // Modifier checkboxes
+            this.chkCtrl.Text = "Ctrl";
+            this.chkCtrl.Location = new Point(20, 310);
+            this.chkCtrl.CheckedChanged += (s, e) => btnApply.Enabled = true;
+
+            this.chkAlt.Text = "Alt";
+            this.chkAlt.Location = new Point(140, 310);
+            this.chkAlt.CheckedChanged += (s, e) => btnApply.Enabled = true;
+
+            this.chkShift.Text = "Shift";
+            this.chkShift.Location = new Point(80, 310);
+            this.chkShift.CheckedChanged += (s, e) => btnApply.Enabled = true;
+
+            // Pattern dropdown
+            this.cmbPattern.Location = new Point(200, 170);
+            this.cmbPattern.DropDownStyle = ComboBoxStyle.DropDownList;
+            this.cmbPattern.Items.AddRange(new object[]
+            {
+                "Circle",
+                "LeftRight",
+                "UpDown",
+                "Jitter",
+                "ZigZag",
+                "HumanIdle",
+                "ShakeBurst"
+            });
+            this.cmbPattern.SelectedIndex = 0;
+
+            // Buttons
+            this.btnStart.Text = "Start";
+            this.btnStart.Location = new Point(20, 200);
+            this.btnStart.Size = new Size(100, 40);
+            this.btnStart.Click += new EventHandler(this.btnStart_Click);
+
+            this.btnStop.Text = "Stop";
+            this.btnStop.Location = new Point(135, 200);
+            this.btnStop.Size = new Size(100, 40);
+            this.btnStop.Click += new EventHandler(this.btnStop_Click);
+
+            this.btnApply.Text = "Apply";
+            this.btnApply.Enabled = false;
+            this.btnApply.Location = new Point(250, 200);
+            this.btnApply.Size = new Size(100, 40);
+            this.btnApply.Click += new EventHandler(this.btnApply_Click);
+
+            // Activate Apply button for these events
+            this.numRadius.ValueChanged += (s, e) => btnApply.Enabled = true;
+            this.numSpeed.ValueChanged += (s, e) => btnApply.Enabled = true;
+            this.numCirclePause.ValueChanged += (s, e) => btnApply.Enabled = true;
+            this.cmbPattern.SelectedIndexChanged += (s, e) => btnApply.Enabled = true;
+
+            // Tray menu
+            this.trayMenu.Items.Add("Open", null, (s, e) =>
+            {
+                this.Show();
+                this.WindowState = FormWindowState.Normal;
+                this.ShowInTaskbar = true;
+            });
+
+            this.trayMenu.Items.Add("Exit", null, (s, e) =>
+            {
+                trayIcon.Visible = false;
+                Application.Exit();
+            });
+
+            this.trayMenu.Items.Add("About", null, (s, e) =>
+            {
+                new AboutForm().ShowDialog();
+            });
+
+            this.trayIcon.Visible = true;
+            this.trayIcon.ContextMenuStrip = this.trayMenu;
+
+            // Form
+            this.ClientSize = new Size(400, 450);
+            this.Text = "MotionSentinel";
+
+            this.Controls.Add(this.lblX);
+            this.Controls.Add(this.lblY);
+            this.Controls.Add(this.lblR);
+            this.Controls.Add(this.lblSpeed);
+            this.Controls.Add(this.lblCirclePause);
+            this.Controls.Add(this.lblPattern);
+            this.Controls.Add(this.lblStatus);
+
+            this.Controls.Add(this.lblCenterXValue);
+            this.Controls.Add(this.lblCenterYValue);
+
+
+            this.Controls.Add(this.numRadius);
+            this.Controls.Add(this.numSpeed);
+            this.Controls.Add(this.numCirclePause);
+
+            this.Controls.Add(this.cmbPattern);
+            this.Controls.Add(this.btnStart);
+            this.Controls.Add(this.btnStop);
+            this.Controls.Add(this.btnApply);
+
+            this.Controls.Add(this.lblHotkey);
+            this.Controls.Add(this.cmbHotkey);
+            this.Controls.Add(this.chkAlt);
+            this.Controls.Add(this.chkShift);
+            this.Controls.Add(this.chkCtrl);
+
+            ((System.ComponentModel.ISupportInitialize)(this.numRadius)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numSpeed)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.numCirclePause)).EndInit();
+
+            this.ResumeLayout(false);
+        }
+    }
+}

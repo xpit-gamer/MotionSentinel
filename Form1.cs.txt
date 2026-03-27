@@ -1,0 +1,444 @@
+using System;
+using System.Drawing;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace MotionSentinel
+{
+    public enum MovementPattern
+    {
+        Circle,
+        LeftRight,
+        UpDown,
+        Jitter,
+        ZigZag,
+        HumanIdle,
+        ShakeBurst
+    }
+
+    // -----------------------------
+    // HOTKEY CONFIG
+    // -----------------------------    
+    public class HotkeyConfig
+    {
+        public List<string> AvailableKeys { get; set; } = new();
+    }
+    public partial class Form1 : Form
+    {
+        private readonly Random rnd = new Random();
+        private CancellationTokenSource? cts;
+        private bool isRunning = false;
+        private MovementPattern pattern = MovementPattern.Circle;
+
+        // -----------------------------
+        // RAW DELTA MOUSE INPUT
+        // -----------------------------
+        [StructLayout(LayoutKind.Sequential)]
+        struct INPUT { public uint type; public MOUSEINPUT mi; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct MOUSEINPUT
+        {
+            public int dx, dy;
+            public uint mouseData, dwFlags, time;
+            public IntPtr dwExtraInfo;
+        }
+
+        [DllImport("user32.dll")] static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+        const uint INPUT_MOUSE = 0;
+        const uint MOUSEEVENTF_MOVE = 0x0001;
+
+        private void MoveMouseDelta(int dx, int dy)
+        {
+            INPUT[] inputs = new INPUT[1];
+            inputs[0].type = INPUT_MOUSE;
+            inputs[0].mi.dx = dx;
+            inputs[0].mi.dy = dy;
+            inputs[0].mi.dwFlags = MOUSEEVENTF_MOVE;
+            SendInput(1, inputs, Marshal.SizeOf(typeof(INPUT)));
+        }
+
+        // -----------------------------
+        // GET CURSOR POSITION
+        // -----------------------------
+        [DllImport("user32.dll")] static extern bool GetCursorPos(out POINT lpPoint);
+
+        public struct POINT { public int X, Y; }
+
+        // -----------------------------
+        // GLOBAL HOTKEY
+        // -----------------------------
+        [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+        [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        private const int HOTKEY_ID = 1;
+        private const int WM_HOTKEY = 0x0312;
+        private const uint MOD_CONTROL = 0x0002;
+        private const uint MOD_SHIFT = 0x0004;
+        private const uint MOD_ALT = 0x0001;
+
+
+        // -----------------------------
+        // FORM INIT
+        // -----------------------------
+        public Form1()
+        {
+            InitializeComponent();
+            this.KeyPreview = true;
+            trayIcon.Icon = LoadEmbeddedIcon("MotionSentinel.resources.mouseshake.ico");
+            trayIcon.Text = "MotionSentinel";
+            this.Icon = trayIcon.Icon;
+            trayIcon.DoubleClick += (s, e) =>
+            {
+                this.Show();
+                this.WindowState = FormWindowState.Normal;
+                this.ShowInTaskbar = true;
+            };
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            bool ok = RegisterHotKey(this.Handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT, (uint)Keys.F12);
+            if (!ok)
+            {
+                MessageBox.Show("Failed to register hotkey CTRL+SHIFT+C. It is probably already in use.",
+                                "Hotkey error",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+            }
+        }
+
+
+        protected override void OnHandleDestroyed(EventArgs e)
+        {
+            UnregisterHotKey(this.Handle, HOTKEY_ID);
+            base.OnHandleDestroyed(e);
+        }
+
+        // -----------------------------
+        // EMBEDDED ICON LOADER
+        // -----------------------------
+        private Icon LoadEmbeddedIcon(string resourceName)
+        {
+            var asm = Assembly.GetExecutingAssembly();
+            using Stream? stream = asm.GetManifestResourceStream(resourceName);
+            return new Icon(stream!);
+        }
+
+        // -----------------------------
+        // TRAY BEHAVIOR
+        // -----------------------------
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            if (this.WindowState == FormWindowState.Minimized)
+            {
+                this.Hide();
+                this.ShowInTaskbar = false;
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                this.Hide();
+                this.ShowInTaskbar = false;
+                return;
+            }
+            base.OnFormClosing(e);
+        }
+
+        // -----------------------------
+        // UPDATE STATUS TEXT
+        // -----------------------------
+        private void UpdateTrayText(string status)
+        {
+            string modText = "";
+            if (chkCtrl.Checked)  modText += "Ctrl+";
+            if (chkAlt.Checked)   modText += "Alt+";
+            if (chkShift.Checked) modText += "Shift+";
+
+            string keyName = cmbHotkey.SelectedItem?.ToString() ?? "None";
+            string fullHotkey = keyName == "None" ? "None" : modText + keyName;
+
+            string fullText = $"MotionSentinel - {status} ({fullHotkey})";
+
+            trayIcon.Text = fullText;
+            lblStatus.Text = fullText;
+        }
+
+        // -----------------------------
+        // HOTKEY HANDLER
+        // -----------------------------
+        protected override void WndProc(ref Message m)
+        {
+            if (m.Msg == WM_HOTKEY && m.WParam.ToInt32() == HOTKEY_ID)
+                ToggleMovement();
+            base.WndProc(ref m);
+        }
+
+        private void ToggleMovement()
+        {
+            if (isRunning) StopMovement();
+            else StartMovement();
+        }
+
+        // -----------------------------
+        // BUTTON EVENTS
+        // -----------------------------
+        private void btnStart_Click(object? sender, EventArgs? e) => StartMovement();
+        private void btnStop_Click(object? sender, EventArgs? e) => StopMovement();
+        private void btnApply_Click(object? sender, EventArgs? e)
+        {
+            btnApply.Enabled = false;
+            pattern = (MovementPattern)cmbPattern.SelectedIndex;
+
+            // No hotkey ("None")
+            if (cmbHotkey.SelectedItem is null || cmbHotkey.SelectedItem.ToString() == "None")
+            {
+                UnregisterHotKey(this.Handle, HOTKEY_ID);
+                UpdateTrayText("Hotkey disabled");
+                return;
+            }
+
+            // Modifiers
+            uint mods = 0;
+            if (chkCtrl.Checked)  mods |= MOD_CONTROL;
+            if (chkAlt.Checked)   mods |= MOD_ALT;
+            if (chkShift.Checked) mods |= MOD_SHIFT;
+
+            // Get keyname
+            if (cmbHotkey.SelectedItem is not string keyName)
+            {
+                UnregisterHotKey(this.Handle, HOTKEY_ID);
+                UpdateTrayText("Hotkey disabled");
+                return;
+            }
+
+            // Convert key
+            if (!Enum.TryParse<Keys>(keyName, out Keys parsed))
+            {
+                MessageBox.Show("Invalid key selected");
+                return;
+            }
+
+            uint key = (uint)(int)parsed;
+
+            // Register hotkey
+            UnregisterHotKey(this.Handle, HOTKEY_ID);
+            bool ok = RegisterHotKey(this.Handle, HOTKEY_ID, mods, key);
+
+            if (!ok)
+            {
+                MessageBox.Show(
+                    "The selected hotkey combination is already in use.\nHotkey has not been changed.",
+                    "Hotkey in use",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning
+                );
+                return;
+            }
+
+            UpdateTrayText("Hotkey updated");
+        }
+
+
+        // -----------------------------
+        // HOTKEY CONFIG
+        // -----------------------------
+
+        private uint GetModifierMask()
+        {
+            uint mod = 0;
+            if (chkCtrl.Checked)  mod |= MOD_CONTROL;
+            if (chkAlt.Checked)   mod |= MOD_ALT;
+            if (chkShift.Checked) mod |= MOD_SHIFT;
+            return mod;
+        }
+
+        private uint? GetSelectedKey()
+        {
+            if (cmbHotkey.SelectedItem is not string keyName)
+                return null;
+
+            if (!Enum.TryParse<Keys>(keyName, out Keys parsed))
+                return null;
+
+            return (uint)parsed;
+        }
+
+        private HotkeyConfig LoadHotkeyConfig()
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, "hotkeys.json");
+
+            if (!File.Exists(path))
+            {
+                var defaultConfig = new HotkeyConfig
+                {
+                    AvailableKeys = new List<string>
+                    {
+                        "None",
+                        "C",
+                        "F10",
+                        "F11",
+                        "F12",
+                        "X",
+                        "Z"
+                    }
+                };
+
+                string json = System.Text.Json.JsonSerializer.Serialize(
+                    defaultConfig,
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true }
+                );
+
+                File.WriteAllText(path, json);
+                return defaultConfig;
+            }
+
+            string content = File.ReadAllText(path);
+            return System.Text.Json.JsonSerializer.Deserialize<HotkeyConfig>(content)
+                ?? new HotkeyConfig();
+        }
+
+        private void LoadHotkeysIntoUI()
+        {
+            var cfg = LoadHotkeyConfig();
+
+            cmbHotkey.Items.Clear();
+            foreach (var key in cfg.AvailableKeys)
+                cmbHotkey.Items.Add(key);
+
+            if (cmbHotkey.Items.Count > 0)
+                cmbHotkey.SelectedIndex = 0;
+        }
+
+        // -----------------------------
+        // MOVEMENT PATTERNS
+        // -----------------------------
+
+        private async Task RunLeftRight(CancellationToken t)
+        {
+            MoveMouseDelta(50, 0); await Task.Delay(120, t);
+            MoveMouseDelta(-50, 0); await Task.Delay(120, t);
+        }
+
+        private async Task RunUpDown(CancellationToken t)
+        {
+            MoveMouseDelta(0, -40); await Task.Delay(120, t);
+            MoveMouseDelta(0, 40); await Task.Delay(120, t);
+        }
+
+        private async Task RunJitter(CancellationToken t)
+        {
+            MoveMouseDelta(rnd.Next(-10, 11), rnd.Next(-10, 11));
+            await Task.Delay(50, t);
+        }
+
+        private async Task RunZigZag(CancellationToken t)
+        {
+            MoveMouseDelta(30, 10); await Task.Delay(80, t);
+            MoveMouseDelta(-30, -10); await Task.Delay(80, t);
+        }
+
+        private async Task RunHumanIdle(CancellationToken t)
+        {
+            int steps = rnd.Next(5, 15);
+            for (int i = 0; i < steps; i++)
+            {
+                MoveMouseDelta(rnd.Next(-5, 6), rnd.Next(-5, 6));
+                await Task.Delay(rnd.Next(80, 300), t);
+            }
+        }
+
+        private async Task RunShakeBurst(CancellationToken t)
+        {
+            int bursts = rnd.Next(10, 25);
+            for (int i = 0; i < bursts; i++)
+            {
+                MoveMouseDelta(rnd.Next(-20, 21), rnd.Next(-20, 21));
+                await Task.Delay(25, t);
+            }
+        }
+
+        // -----------------------------
+        // START / STOP LOGIC
+        // -----------------------------
+
+        private void StartMovement()
+        {
+            cts?.Cancel();
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+
+            isRunning = true;
+            lblStatus.ForeColor = Color.Green;
+            UpdateTrayText("Running");
+            pattern = (MovementPattern)cmbPattern.SelectedIndex;
+
+            Task.Run(async () =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    GetCursorPos(out POINT p);
+                    int cx = p.X, cy = p.Y;
+
+                    int radius = (int)numRadius.Value;
+                    int speed = (int)numSpeed.Value;
+                    int pause = (int)numCirclePause.Value;
+
+                    Invoke(() =>
+                    {
+                        lblCenterXValue.Text = cx.ToString();
+                        lblCenterYValue.Text = cy.ToString();
+                    });
+
+                    switch (pattern)
+                    {
+                        case MovementPattern.Circle:
+                            int px = cx, py = cy;
+                            for (int angle = 0; angle < 360; angle += speed)
+                            {
+                                if (token.IsCancellationRequested) return;
+                                double rad = angle * Math.PI / 180;
+                                int x = cx + (int)(radius * Math.Cos(rad));
+                                int y = cy + (int)(radius * Math.Sin(rad));
+                                MoveMouseDelta(x - px, y - py);
+                                px = x; py = y;
+                                await Task.Delay(1, token);
+                            }
+                            break;
+
+                        case MovementPattern.LeftRight: await RunLeftRight(token); break;
+                        case MovementPattern.UpDown: await RunUpDown(token); break;
+                        case MovementPattern.Jitter: await RunJitter(token); break;
+                        case MovementPattern.ZigZag: await RunZigZag(token); break;
+                        case MovementPattern.HumanIdle: await RunHumanIdle(token); break;
+                        case MovementPattern.ShakeBurst: await RunShakeBurst(token); break;
+                    }
+
+                    await Task.Delay(pause, token);
+                }
+            }, token);
+        UpdateTrayText("Running");
+        }
+
+        private void StopMovement()
+        {
+            cts?.Cancel();
+            isRunning = false;
+            
+            lblStatus.ForeColor = Color.Red;
+            UpdateTrayText("Stopped");
+
+        }
+    }
+}
