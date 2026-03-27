@@ -71,3 +71,10 @@ MIT License.
 ## 👤 Developer
 
 MotionSentinel is developed by XpiT Gamer. xpit.gamer@gmail.com
+
+## 📥 Download
+
+Go to the **Releases** page and download a precompiled Windows binary ZIP file under **Assets**.
+
+➡️ https://github.com/xpit-gamer/MotionSentinel/releases
+
